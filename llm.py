@@ -1,28 +1,31 @@
-import os
-import uuid
-from dotenv import load_dotenv
 from openai import AsyncOpenAI
-
-load_dotenv()
+from config import SILICONFLOW_API_KEY, BASE_URL, MODEL_NAME
+from conversation import create_conversation, add_message, get_history, exists
 
 client = AsyncOpenAI(
-    api_key=os.getenv("SILICONFLOW_API_KEY"),
-    base_url="https://api.siliconflow.cn/v1"
+    api_key=SILICONFLOW_API_KEY,
+    base_url=BASE_URL
 )
 
-conversations: dict[str, list[dict[str, str]]] = {}
+async def chat(conversation_id: str | None, 
+               message: str
+    ) -> tuple[str, str]:
+    if conversation_id is None or not exists(conversation_id):
+        conversation_id = create_conversation()
+        
+    add_message(conversation_id, "user", message)
+    
+    history = get_history(conversation_id)
+    
+    response = await call_llm(history)
+    content = response.choices[0].message.content
+    
+    add_message(conversation_id, "assistant", content)
+    
+    return conversation_id, content
 
-async def chat(conversation_id: str | None, message: str) -> tuple[str, str]:
-    if conversation_id is None:
-        conversation_id = str(uuid.uuid4())
-    if conversation_id not in conversations:
-        conversations[conversation_id] = []
-    conversations[conversation_id].append({"role": "user", "content": message})
-    history = conversations[conversation_id]
-    response = await client.chat.completions.create(
-        model=os.getenv("MODEL_NAME"),
+async def call_llm(history):
+    return await client.chat.completions.create(
+        model=MODEL_NAME,
         messages=history
     )
-    content = response.choices[0].message.content
-    conversations[conversation_id].append({"role": "assistant", "content": content})
-    return conversation_id, content
