@@ -1,6 +1,6 @@
 from openai import AsyncOpenAI
-from config import SILICONFLOW_API_KEY, BASE_URL, MODEL_NAME
-from conversation import create_conversation, add_message, get_history, exists
+from config import SILICONFLOW_API_KEY, BASE_URL, MODEL_NAME, MAX_MESSAGES
+from conversation import *
 
 client = AsyncOpenAI(
     api_key=SILICONFLOW_API_KEY,
@@ -12,10 +12,12 @@ async def chat(conversation_id: str | None,
     ) -> tuple[str, str]:
     if conversation_id is None or not exists(conversation_id):
         conversation_id = create_conversation()
-        
-    add_message(conversation_id, "user", message)
     
+    if get_history_length(conversation_id) > MAX_MESSAGES:
+        await update_summary(conversation_id)
     history = get_history(conversation_id)
+
+    add_message(conversation_id, "user", message)
     
     response = await call_llm(history)
     content = response.choices[0].message.content
@@ -24,8 +26,28 @@ async def chat(conversation_id: str | None,
     
     return conversation_id, content
 
-async def call_llm(history):
+async def call_llm(messages: list[dict[str, str]]):
     return await client.chat.completions.create(
         model=MODEL_NAME,
-        messages=history
+        messages=messages
     )
+
+async def update_summary(conversation_id: str) -> None:
+    history = get_history(conversation_id)
+    conversation_text = "\n".join(
+        [
+            f"{m['role']}: {m['content']}"
+            for m in history
+        ]
+    )
+    summary_prompt = f"""
+        请总结以下对话，保留关键信息：
+        {conversation_text}
+        """
+    
+    response = await call_llm([{"role": "system", "content": summary_prompt}])
+    
+    summary = response.choices[0].message.content
+
+    compress_history(conversation_id, summary)
+
