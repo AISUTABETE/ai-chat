@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from llm import chat
+from chat import chat
 
 app = FastAPI()
 
