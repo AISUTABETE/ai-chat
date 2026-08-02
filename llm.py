@@ -12,4 +12,14 @@ async def call_llm(messages: list[dict[str, str]]):
         messages=messages
     )
 
+async def stream_llm(messages: list[dict[str, str]]):
+    response = await client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=messages,
+        stream=True
+    )
+    async for chunk in response:
+        content = chunk.choices[0].delta.content
+        if content:
+            yield content
 

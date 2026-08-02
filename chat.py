@@ -8,26 +8,24 @@ from conversation import (
     get_history_length,
 )
 
-from llm import call_llm
+from llm import stream_llm, call_llm
 
-async def chat(conversation_id: str | None, 
-               message: str
-    ) -> tuple[str, str]:
+async def chat(conversation_id: str, message: str):
     if conversation_id is None or not exists(conversation_id):
         conversation_id = create_conversation()
+    
+    add_message(conversation_id, "user", message)
     
     if get_history_length(conversation_id) > MAX_MESSAGES:
         await update_summary(conversation_id)
     history = get_history(conversation_id)
-
-    add_message(conversation_id, "user", message)
     
-    response = await call_llm(history)
-    content = response.choices[0].message.content
-    
-    add_message(conversation_id, "assistant", content)
-    
-    return conversation_id, content
+    response = stream_llm(history)
+    answer = ""
+    async for chunk in response:
+        answer += chunk
+        yield chunk
+    add_message(conversation_id, "assistant", answer)
 
 async def update_summary(conversation_id: str) -> None:
     history = get_history(conversation_id)

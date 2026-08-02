@@ -1,19 +1,18 @@
 import uuid
 
 from config import SYSTEM_PROMPT, KEEP_MESSAGES
-
-conversations: dict[str, dict] = {}
+from repository import(
+    insert_conversation,
+    insert_message,
+    select_messages,
+    conversation_exists,
+    count_messages
+)
 
 def create_conversation() -> str:
     conversation_id = str(uuid.uuid4())
-    conversations[conversation_id] = {
-        "messages" : [
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT
-            }
-        ]
-    }
+    insert_conversation(conversation_id, created_at=None)
+    insert_message(conversation_id, "system", SYSTEM_PROMPT, created_at=None)
     return conversation_id
 
 def add_message(conversation_id: str,
@@ -22,21 +21,15 @@ def add_message(conversation_id: str,
     ) -> None:
     if not exists(conversation_id):
         raise ValueError(f"Conversation ID {conversation_id} does not exist.")
-    conversations[conversation_id]["messages"].append(
-        {
-            "role": role,
-            "content": content
-        }
-    )
+    insert_message(conversation_id, role, content, created_at=None)
 
 def get_history(conversation_id: str) -> list[dict[str, str]]:
-    return conversations[conversation_id]["messages"]
+    return select_messages(conversation_id)
 
 def get_history_length(conversation_id: str) -> int:
-    return len(conversations[conversation_id]["messages"])
-
+    return count_messages(conversation_id)
 def exists(conversation_id: str) -> bool:
-    return conversation_id in conversations
+    return conversation_exists(conversation_id)
 
 def compress_history(conversation_id: str, summary: str) -> None:
     conversation = conversations[conversation_id]
