@@ -1,4 +1,4 @@
-import sqlite3
+from config import KEEP_MESSAGES
 from database import get_connection
 
 
@@ -61,7 +61,13 @@ def select_messages(conversation_id):
 
     conn.close()
 
-    return rows
+    return [
+        {
+            "role": row[0],
+            "content": row[1]
+        }
+        for row in rows
+    ]
 
 
 # repository.py
@@ -108,3 +114,46 @@ def count_messages(conversation_id: str) -> int:
     conn.close()
 
     return count
+
+def delete_old_messages(conversation_id: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        DELETE FROM message
+        WHERE conversation_id = ? AND id NOT IN (
+            SELECT id FROM message
+            WHERE conversation_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+        )
+        """,
+        (conversation_id, conversation_id, KEEP_MESSAGES),
+    )
+
+    conn.commit()
+    conn.close()
+
+def delete_conversation(conversation_id: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        DELETE FROM message
+        WHERE conversation_id = ?
+        """,
+        (conversation_id,),
+    )
+
+    cursor.execute(
+        """
+        DELETE FROM conversation
+        WHERE id = ?
+        """,
+        (conversation_id,),
+    )
+
+    conn.commit()
+    conn.close()
